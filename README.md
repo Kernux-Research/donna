@@ -1,6 +1,6 @@
 # Donna
 
-Donna is an open source personal agent built on Cloudflare Workers. It provides a client-independent API and an optional first-party web interface.
+Donna is an open source personal agent built on Cloudflare Workers. It provides a client-independent API and a responsive web interface for phone, tablet, and desktop browsers.
 
 External services are available only through narrowly scoped Gatekeepers. Model inference is handled separately through each deployer's own Cloudflare AI Gateway.
 
@@ -11,7 +11,7 @@ Donna is in its initial scaffolding stage. The current applications expose an AP
 ## Repository structure
 
 - `apps/api`: Donna's public, client-independent API Worker
-- `apps/web`: the optional first-party React client
+- `apps/web`: the responsive first-party React client
 - `packages/api-contract`: shared runtime schemas and derived API types
 - `packages/`: tooling and shared packages inherited from the Workers monorepo template
 - `turbo/generators`: generators for additional Workers and packages

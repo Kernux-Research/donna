@@ -1,7 +1,8 @@
 # Donna agent instructions
 
 - Donna is an open source personal agent designed for Cloudflare Workers.
-- The API is the complete, client-independent product boundary. `apps/web` is an optional first-party client and must not import API implementation code.
+- The API is the complete, client-independent product boundary. `apps/web` is the only bundled client and must not import API implementation code.
+- Build `apps/web` as a responsive browser application for phone, tablet, and desktop viewports. Do not add native mobile or desktop clients unless the product scope changes.
 - External services must only be reachable through explicit Gatekeeper capabilities. Do not add ambient outbound access.
 - Model inference is the kernel-managed exception: deployers supply their own Cloudflare AI Gateway configuration, while agent-generated code remains network-isolated.
 - Shared API schemas belong in `packages/api-contract`. Derive TypeScript types from those schemas rather than defining separate contracts.
