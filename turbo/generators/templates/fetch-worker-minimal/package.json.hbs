@@ -1,0 +1,26 @@
+{
+	"name": "{{ slug name }}",
+	"version": "0.1.0",
+	"private": true,
+	"sideEffects": false,
+	"type": "module",
+	"scripts": {
+		"build:wrangler": "runx build wrangler",
+		"check:lint": "run-oxlint",
+		"check:types": "run-tsc",
+		"check:workers-types": "run-wrangler-types --check",
+		"deploy": "runx deploy wrangler",
+		"dev": "runx dev wrangler",
+		"fix:workers-types": "run-wrangler-types",
+		"test": "run-vitest"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "0.22.0",
+		"@repo/tools": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "25.5.0",
+		"vite": "7.3.5",
+		"vitest": "4.1.5",
+		"wrangler": "4.127.1"
+	}
+}
