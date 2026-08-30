@@ -1,5 +1,11 @@
 # @repo/workspace-dependencies
 
+## 0.1.4
+
+### Patch Changes
+
+- 9dd0df2: Scaffold Donna's Workers monorepo with independent API and web applications, a shared API contract, and repository tooling.
+
 ## 0.1.3
 
 ### Patch Changes
