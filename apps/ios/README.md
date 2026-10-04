@@ -22,6 +22,6 @@ xcodebuild test -project DonnaIOS.xcodeproj -scheme DonnaIOS -destination 'platf
 
 If `xcodebuild` reports that Command Line Tools are selected, prefix the command with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`. This selects Xcode for that command without changing the system setting.
 
-The generated `.xcodeproj` is ignored by Git; `project.yml` is the source of truth. `.github/workflows/ios.yml` runs the same simulator test on a GitHub-hosted Mac when iOS files change. SwiftUI and the iOS Simulator cannot be built or run on this Linux workstation.
+The generated `.xcodeproj` is ignored by Git; `project.yml` is the source of truth. `.github/workflows/ios.yml` runs the same simulator test on a GitHub-hosted Mac for pull requests that change iOS files, or when started manually. SwiftUI and the iOS Simulator cannot be built or run on this Linux workstation.
 
 For repository conventions, see [AGENTS.md](../../AGENTS.md).
