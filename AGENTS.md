@@ -17,7 +17,7 @@
 
 ## Commands
 
-- `apps/ios/project.yml` defines the XcodeGen project. Generate it on a Mac with XcodeGen 2.46.0 or newer, then run the `DonnaIOS` simulator scheme. `.github/workflows/ios.yml` runs iOS UI tests on macOS; Linux cannot validate SwiftUI or the simulator.
+- `apps/ios/project.yml` defines the XcodeGen project. Generate it on a Mac with XcodeGen 2.46.0 or newer, then run the `DonnaIOS` simulator scheme. `.github/workflows/ios.yml` runs iOS UI tests on macOS; Linux cannot validate SwiftUI or the simulator. After iOS edits on Linux, sync only `apps/ios` to the Mac without `.env` or generated files, then rebuild and relaunch the simulator; copying files alone does not update the running app. Keep Mac SSH details out of the repository.
 - Use `bun turbo <command>` for validation.
 - For individual packages, run the command within the package directory.
 - For multiple packages, run `bun turbo -F <package-name> -F <other-package-name> <command>` from the repository root.
