@@ -29,3 +29,4 @@ onlyBuiltDependenciesFile: node_modules/.pnpm-config/@pnpm/trusted-deps/allow.js
 
 minimumReleaseAgeExclude:
   - '@cloudflare/workers-types@5.20260829.1'
+  - lucide-react@1.52.0

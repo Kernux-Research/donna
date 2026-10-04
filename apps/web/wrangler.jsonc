@@ -1,12 +1,17 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "donna-web",
+	"main": "src/donna-web.worker.ts",
 	"compatibility_date": "2026-06-04",
 	"workers_dev": false,
 	"preview_urls": false,
+	"routes": [{ "pattern": "donna.kernux.org", "custom_domain": true }],
+	"services": [{ "binding": "DONNA_API", "service": "donna-api" }],
 	"assets": {
 		"directory": "./dist",
-		"not_found_handling": "single-page-application"
+		"not_found_handling": "single-page-application",
+		"binding": "ASSETS",
+		"run_worker_first": ["/api/*"]
 	},
 	"observability": {
 		"logs": {

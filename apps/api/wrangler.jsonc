@@ -7,7 +7,7 @@
 	"workers_dev": false,
 	"preview_urls": false,
 	"logpush": true,
-	"routes": [],
+	"routes": [{ "pattern": "donna-api.kernux.org", "custom_domain": true }],
 	"observability": {
 		"logs": {
 			"enabled": true,
@@ -22,6 +22,10 @@
 		"RELEASE": "unknown", // overridden during deployment
 		"NAME": "donna-api"
 	},
+	"durable_objects": {
+		"bindings": [{ "name": "DONNA_THREADS", "class_name": "DonnaThreads" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["DonnaThreads"] }],
 	"version_metadata": {
 		"binding": "CF_VERSION_METADATA"
 	},

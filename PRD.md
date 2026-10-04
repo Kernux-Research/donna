@@ -2,11 +2,11 @@
 
 ## Overview
 
-Donna is an open source personal agent deployed to a user's Cloudflare account. Donna exposes a client-independent API and includes one responsive web client for phone, tablet, and desktop browsers.
+Donna is an open source personal agent hosted on Cloudflare Workers for users who bring their own model API. Donna exposes a client-independent API and includes one responsive web client for phone, tablet, and desktop browsers.
 
-This milestone delivers the first working conversational agent. A deployer can connect Donna to their own Cloudflare AI Gateway, create a thread, send a message, stream the response, and reload the persisted conversation.
+This milestone delivers the first working conversational agent. A deployer can connect Donna to their own OpenAI-compatible API, create a thread, send a message, stream the response, and reload the persisted conversation.
 
-Donna cannot access external services directly. Future external integrations must use explicit Gatekeeper capabilities. Model inference through the deployer's Cloudflare AI Gateway is the kernel-managed exception.
+Donna cannot access external services directly. Future external integrations must use explicit Gatekeeper capabilities. Model inference through the deployer's OpenAI-compatible API is the kernel-managed exception.
 
 ## Problem
 
@@ -16,19 +16,19 @@ Donna needs a minimal foundation that proves four boundaries:
 
 - The API works independently of the bundled web client.
 - Conversation state survives Worker and browser restarts.
-- Model inference always passes through the deployer's Cloudflare AI Gateway.
+- Model inference always passes through the authenticated user's OpenAI-compatible API via the API Worker.
 - The agent starts with no external-service capabilities.
 
 ## Goals
 
 - Run a basic conversational agent on Cloudflare Workers.
-- Let each deployer configure their own Cloudflare account, AI Gateway, and model.
+- Let each signed-in user configure their own OpenAI-compatible API endpoint, key, and model.
 - Authenticate every non-health API request.
 - Persist threads and completed messages in Durable Object storage.
 - Stream assistant output to API clients.
 - Provide a responsive first-party web experience.
 - Define runtime API schemas in `packages/api-contract`.
-- Keep Cloudflare credentials outside the API, web client, prompts, and conversation storage.
+- Encrypt provider keys in per-user storage; never return saved keys to browsers, prompts, or conversation messages.
 - Establish an agent loop that can accept Gatekeeper tools in a later milestone.
 
 ## Non-goals
@@ -42,58 +42,57 @@ Donna needs a minimal foundation that proves four boundaries:
 - Thread search, branching, sharing, or collaboration
 - Multiple agent personalities
 - Model selection in the web client
-- OAuth or social login
+- OAuth or social login (Cloudflare Access email-code login handles initial sign-in)
 - Native mobile or desktop clients
 - Background schedules
 - Provider-native web search
-- Production billing or usage limits
+- Production billing or usage limits (the Cloudflare Access free tier limits enrollment)
 
 ## Users
 
-The initial user is a technical self-hoster who:
+A hosted user:
 
-- Has a Cloudflare account.
-- Can create and configure an AI Gateway.
-- Can create a scoped Cloudflare API token.
-- Wants a private personal agent with explicit security boundaries.
+- Signs in using a verified email through Cloudflare Access.
+- Brings an OpenAI-compatible chat completions API endpoint and key.
+- Has private chats and model settings, isolated from other users.
 - Uses Donna through the responsive web client or their own API client.
 
-Multi-tenant hosted deployments are outside this milestone.
+Hosted users sign in through Cloudflare Access email codes. Each user has a separate conversation store and supplies their own model key. The original deployer retains the legacy conversation store.
 
 ## Primary user journey
 
-1. The deployer configures Donna with a Cloudflare account ID, AI Gateway ID, Cloudflare API token, model ID, and Donna API token.
-2. The deployer deploys the API, inference, and web Workers.
+1. The deployer configures the API's Access identity verification, owner account mapping, persistent encryption key, and deployer API token.
+2. The deployer deploys the API and web Workers with Cloudflare Access email-code sign-in.
 3. The user opens the web client.
-4. The user enters the Donna API token.
-5. The client verifies connectivity and authentication.
-6. The user creates a thread.
+4. Cloudflare Access signs the user in to the web deployment.
+5. The web Worker verifies the Access JWT and forwards it through a service binding. The API Worker verifies it again and selects the user's store.
+6. The user enters their own model endpoint, key, and model ID in Settings, then starts a main or side chat.
 7. The user sends a message.
 8. Donna streams an assistant response.
 9. The user reloads the page.
 10. The thread and completed messages remain available.
-11. The deployer can find the inference request in their configured AI Gateway logs.
+11. The deployer can inspect inference requests using their provider's own logs, when available.
 
 ## Product boundaries
 
 - `apps/api` is the complete public product boundary.
 - `apps/web` is a first-party API client and must not import API implementation code.
-- `apps/inference` is an internal Worker reachable from the API only through a service binding.
+- `apps/api` owns the server-side inference adapter and Durable Object conversation store.
 - `packages/api-contract` owns public request, response, event, and error schemas.
-- The inference Worker is the only component that owns the Cloudflare API token.
+- The API Worker is the only component that stores encrypted provider keys and decrypts them for model inference.
 - The agent has no generic external-service tools or provider credentials.
 
 ## Architecture
 
 ```text
 Responsive web client
-  -> Donna API Worker
-    -> Thread Durable Object
-      -> Inference Worker service binding
-        -> Deployer's Cloudflare AI Gateway
+  -> Access-protected web Worker (verified JWT, service binding)
+    -> Donna API Worker
+    -> Per-user Durable Object (chats and encrypted model settings)
+      -> User's OpenAI-compatible chat completions endpoint
 ```
 
-The API Worker handles authentication, routing, validation, and thread lookup. Each thread maps to one Durable Object. The Durable Object serializes conversation mutations and invokes the inference Worker. The inference Worker calls Cloudflare's AI REST API and streams normalized output back to the Durable Object.
+The API Worker handles authentication, routing, and validation. A Durable Object stores and serializes conversation mutations. Its server-side inference adapter calls the user's configured OpenAI-compatible endpoint and streams normalized output to the client.
 
 ## Deployment configuration
 
@@ -102,30 +101,32 @@ The API Worker requires:
 ```text
 DONNA_API_TOKEN
 DONNA_WEB_ORIGIN
+ACCESS_TEAM_DOMAIN
+ACCESS_AUD
+DONNA_OWNER_EMAIL
+SETTINGS_ENCRYPTION_KEY
 ```
 
-The inference Worker requires:
+The original owner may retain the legacy Worker secret fallback:
 
 ```text
-CLOUDFLARE_ACCOUNT_ID
-CLOUDFLARE_AI_GATEWAY_ID
-CLOUDFLARE_API_TOKEN
-DONNA_MODEL
+OPENAI_BASE_URL
+OPENAI_API_KEY
+OPENAI_MODEL
 ```
 
 Requirements:
 
-- `CLOUDFLARE_API_TOKEN` must be stored as a Worker secret.
+- `OPENAI_API_KEY` must be stored as a Worker secret.
 - `DONNA_API_TOKEN` must be stored as a Worker secret.
 - `.env.example` files contain names and placeholders only.
 - Populated `.env` files remain ignored by Git.
-- Donna must not include a direct-provider fallback.
-- Donna must send the configured AI Gateway ID on every inference request.
+- Donna sends model requests only to the authenticated user's saved HTTPS endpoint. It rejects embedded URL credentials, query strings, and remote plain HTTP.
 - Donna must require an explicit model identifier rather than silently choosing one.
 
 ## Authentication
 
-Proposed initial authentication uses a deployment-wide bearer token:
+The original deployer retains a bearer token for their own store:
 
 ```http
 Authorization: Bearer <DONNA_API_TOKEN>
@@ -138,7 +139,8 @@ Requirements:
 - Authentication comparison must not leak token length or contents through logs or responses.
 - The API must never return the configured token.
 - The web build must not contain the token.
-- The web client may retain the token in memory or `sessionStorage` for the current browser session.
+- The browser must never receive or store the Donna API token.
+- The web Worker and API Worker both verify the Access application JWT. The API rejects missing identity claims and scopes all chat and settings requests to that verified user. A missing or invalid Access configuration fails closed.
 - The API must restrict browser CORS access to `DONNA_WEB_ORIGIN`.
 - Non-browser API clients are not restricted by CORS.
 
@@ -149,7 +151,7 @@ Errors:
 401 invalid_api_token
 ```
 
-Cloudflare Access and user-specific sessions are future authentication options.
+Cloudflare Access email codes provide public sign-in (up to the account plan's user limit). The API also accepts an Access JWT as a user-scoped bearer token for independent clients. The deployer token accesses only the owner's legacy store.
 
 ## Thread requirements
 
@@ -158,18 +160,23 @@ A thread contains:
 - A unique thread ID
 - A creation timestamp
 - An update timestamp
+- A kind: permanent main chat or side chat
+- A title, derived from the first user message for side chats
 - An ordered sequence of messages
 - The status of any active generation
 
 The first release supports:
 
-- Create a thread
+- Get or create one permanent main chat, opened by default on each web visit
+- Create multiple side chats; existing threads remain side chats
 - List threads
 - Retrieve one thread and its messages
+- Rename or delete side chats, never the main chat
+- Search loaded side-chat titles in the web client
 - Send a user message
 - Stream the assistant response
 
-The first release does not support deleting, renaming, searching, sharing, or branching threads.
+The first release does not support full-text message search, sharing, or branching threads.
 
 Only one generation may run in a thread at a time. A concurrent send must return:
 
@@ -200,9 +207,14 @@ Initial endpoints:
 
 ```http
 GET  /v1/health
+GET  /v1/settings/model
+PUT  /v1/settings/model
+GET  /v1/threads/main
 POST /v1/threads
 GET  /v1/threads
 GET  /v1/threads/:threadId
+PATCH /v1/threads/:threadId
+DELETE /v1/threads/:threadId
 POST /v1/threads/:threadId/messages
 ```
 
@@ -233,6 +245,8 @@ The stream must preserve event order. Exactly one terminal event, `message.compl
 - `CreateThreadResponse`
 - `ListThreadsResponse`
 - `GetThreadResponse`
+- `UpdateThreadRequest`
+- `UpdateThreadResponse`
 - `SendMessageRequest`
 - `AgentStreamEvent`
 - `ApiError`
@@ -243,16 +257,17 @@ Applications must not define parallel handwritten versions of contract types.
 
 ## Inference requirements
 
-The inference Worker calls Cloudflare's OpenAI-compatible endpoint:
+The API Worker's server-side inference adapter calls the configured endpoint:
 
 ```text
-POST https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1/chat/completions
+POST {OPENAI_BASE_URL}/chat/completions
 ```
+
+The base URL must use HTTPS except for localhost development.
 
 It must send:
 
-- The configured Cloudflare bearer token
-- The configured `cf-aig-gateway-id`
+- The configured provider bearer key
 - The configured model
 - The Donna system message
 - The persisted conversation context
@@ -260,13 +275,11 @@ It must send:
 
 It must not send:
 
-- A direct provider API key
-- A direct provider base URL
 - Gatekeeper credentials
 - The Donna API token
 - Browser state
 
-The inference Worker normalizes upstream chunks into Donna stream deltas. Provider-specific response formats must not cross the service-binding boundary.
+The inference adapter normalizes upstream chunks into Donna stream deltas. Provider-specific response formats must not cross the public API boundary.
 
 Provider-native tools, including provider-hosted web search, must remain disabled because they bypass Donna's Gatekeeper policy.
 
@@ -284,27 +297,18 @@ The exact wording belongs in one searchable source file and must be covered by a
 
 ## Agent loop
 
-Proposed implementation uses `@earendil-works/pi-agent-core`, matching the agent-loop foundation used by Cloudflare OS.
-
-Before adopting it, a compatibility spike must prove that the current package:
-
-- Bundles for Cloudflare Workers.
-- Runs without Node-only runtime failures.
-- Accepts Donna's AI Gateway model and stream adapter.
-- Streams a fake assistant response in a Workers integration test.
-- Does not import unused provider implementations into the Worker bundle.
-
-If the spike fails, the milestone may use a small internal conversation loop. The fallback must preserve the same inference and event contracts so Pi can replace it later without changing clients.
+The first milestone uses a small internal conversation loop. A future agent-loop library may replace it without changing the public API or event contracts.
 
 ## Responsive web requirements
 
 The web client provides:
 
-- An API-token connection screen
-- A thread list
-- A new-thread action
-- Message history
-- A message composer
+- No deployer API-token prompt; web authentication uses Cloudflare Access
+- A Settings tab for each user's model API base URL, model ID, and API key (never returned after save)
+- A pinned, non-deletable main chat and a side-chat list with title search, inline rename, and confirmed deletion
+- A new side-chat action
+- Message history in chat bubbles with Markdown display and copy action
+- A message composer with Enter-to-send and Shift+Enter newline
 - A visible streaming assistant message
 - Loading, empty, disconnected, and failure states
 - Keyboard-accessible controls
@@ -318,7 +322,7 @@ Viewport behavior:
 
 The web client must remain usable at a width of 320 CSS pixels. It must not depend on hover for primary actions.
 
-The first release renders plain text. Rich Markdown, syntax highlighting, and attachments are deferred.
+The first release renders safe Markdown without raw HTML. Syntax highlighting and attachments are deferred.
 
 ## Error behavior
 
@@ -329,9 +333,9 @@ The API contract must distinguish:
 - Thread not found
 - Concurrent generation
 - Inference configuration failure
-- AI Gateway authentication or authorization failure
-- AI Gateway rate limit
-- AI Gateway model failure
+- Provider authentication or authorization failure
+- Provider rate limit
+- Provider model failure
 - Stream interruption
 - Internal persistence failure
 
@@ -347,7 +351,7 @@ Record structured events for:
 - Generation failure
 - Inference duration
 - Selected model
-- AI Gateway request or log ID when available
+- OpenAI-compatible API request or log ID when available
 - Input and output token usage when available
 
 Do not log message content by default.
@@ -365,11 +369,11 @@ Do not log message content by default.
 ## Security requirements
 
 - Agent-generated content never becomes executable code in this milestone.
-- The inference token exists only in the inference Worker.
-- The web client has no Cloudflare credentials.
+- The provider key exists only in the API Worker's server-side environment.
+- A user enters their own provider key in the browser Settings form; the browser does not persist it and the API never returns it. The web Worker does not hold the deployer bearer token.
 - The API token must be redacted from logs.
 - CORS must use the configured web origin rather than `*` for authenticated endpoints.
-- Every external model request must target the Cloudflare API host.
+- Every external model request must target the configured HTTPS base URL (localhost HTTP is allowed for development).
 - No endpoint may accept an arbitrary inference URL.
 - No provider-native external tools may be enabled.
 - No Gatekeeper capability exists until explicitly introduced in a later milestone.
@@ -396,18 +400,16 @@ API Worker integration tests cover:
 - Concurrent generation rejection
 - Unknown thread handling
 
-Inference Worker tests cover:
+Inference adapter tests cover:
 
-- Configured account, Gateway, and model forwarding
-- Cloudflare authorization
-- Stream parsing
-- Normalized failures
+- Configured base URL, key, and model forwarding
+- Stream parsing and normalized failures
 - Credential redaction
-- Rejection of direct-provider URLs
+- Rejection of insecure remote URLs
 
 Web tests cover:
 
-- Token connection flow
+- Access JWT verification and rejection of unauthenticated proxy requests
 - Thread creation
 - Thread selection
 - Message sending
@@ -424,31 +426,25 @@ Repository validation must pass through the existing `just check` workflow.
 
 1. Add API and event schemas.
 2. Add bearer-token middleware and tests.
-3. Add `ThreadDurableObject` with fake inference.
-4. Complete the API-to-Durable-Object-to-stream path.
-5. Build the responsive thread and chat interface against fake inference.
-6. Add `apps/inference` and AI Gateway streaming.
-7. Run the Pi compatibility spike.
-8. Connect the selected agent loop.
-9. Add observability and failure handling.
-10. Validate both local and deployed behavior.
-
-Each step should leave tests passing. The fake inference path remains available only to tests after real inference is connected.
+3. Add the conversation Durable Object and API-to-stream path.
+4. Add the OpenAI-compatible streaming adapter.
+5. Build the responsive thread and chat interface.
+6. Add observability and failure handling.
+7. Validate both local and deployed behavior.
 
 ## Acceptance criteria
 
 The milestone is complete when:
 
 - A clean checkout installs and passes `just check`.
-- The API, inference, and web Workers build independently.
+- The API and web Workers build independently.
 - Wrangler dry runs succeed for every deployable Worker.
-- A deployer can configure their own Cloudflare AI Gateway and model without editing source code.
+- A deployer can configure their own OpenAI-compatible API and model without editing source code.
 - An unauthenticated client cannot access thread or message data.
 - A user can create a thread and send a message from the responsive web client.
 - The assistant response streams visibly.
 - Reloading restores the completed conversation.
-- The inference request appears in the configured AI Gateway logs.
-- No direct model-provider request occurs.
+- The inference request reaches only the configured provider endpoint.
 - No external-service tool is available to Donna.
 - Phone, tablet, and desktop browser layouts are usable.
 
@@ -457,7 +453,7 @@ The milestone is complete when:
 For the initial self-hosted milestone:
 
 - Successful completion of the primary user journey
-- Zero direct provider API calls
+- Zero model requests to unconfigured endpoints
 - Zero credentials present in browser assets, prompts, conversation storage, or logs
 - All contract, integration, web, lint, type, format, and build checks passing
 - A failed inference request leaves the thread in a recoverable state
@@ -466,21 +462,19 @@ Usage growth, retention, response latency targets, and cost targets should be de
 
 ## Risks
 
-- `pi-agent-core` may require adaptation for the current Workers runtime or AI Gateway REST API.
+- OpenAI-compatible providers differ in streaming behavior and model support.
 - Streaming may be interrupted when the browser disconnects or a Worker is restarted.
 - A deployment-wide bearer token is simple but does not provide user-level identity or revocation.
-- AI Gateway model capabilities differ, even behind a common request format.
+- OpenAI-compatible API model capabilities differ, even behind a common request format.
 - Provider-native tools could violate the Gatekeeper boundary if enabled accidentally.
 - Static web deployment and a separate API origin require correct CORS configuration.
 
-## Open decisions
+## Decisions
 
-Implementation must not begin until these are confirmed:
-
-1. Use deployment-wide bearer-token authentication for the first release.
-2. Run the Pi compatibility spike and permit a small internal loop as fallback.
-3. Cancel generation when the initiating client disconnects, rather than continuing in the background.
-4. Store the web token in `sessionStorage`, rather than requiring re-entry after every page reload.
+- Use deployment-wide bearer-token authentication.
+- Use a small internal loop for the first release.
+- Keep the Donna API token only in Worker secrets, never in browser storage.
+- A client disconnect may cancel generation.
 
 ## Future milestones
 
@@ -499,7 +493,5 @@ After the basic agent works:
 
 ## References
 
-- [Cloudflare AI Gateway REST API](https://developers.cloudflare.com/ai-gateway/usage/rest-api/)
-- [Cloudflare AI model catalog](https://developers.cloudflare.com/ai/models/)
-- [Cloudflare OS](https://github.com/cloudflare/cloudflare-os)
-- [Cloudflare OS AI model integration](https://github.com/cloudflare/cloudflare-os/blob/main/packages/workshop-backend/src/ai-models.ts)
+- [OpenAI chat completions API](https://platform.openai.com/docs/api-reference/chat/create)
+- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/)

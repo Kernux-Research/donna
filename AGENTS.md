@@ -2,11 +2,16 @@
 
 - Donna is an open source personal agent designed for Cloudflare Workers.
 - The API is the complete, client-independent product boundary. `apps/web` is the only bundled client and must not import API implementation code.
+- The bundled web client must not ask for or expose the Donna deployer API token. Its Worker validates the Cloudflare Access JWT and forwards only that verified identity through the API service binding; the API validates the JWT independently.
 - Build `apps/web` as a responsive browser application for phone, tablet, and desktop viewports. Do not add native mobile or desktop clients unless the product scope changes.
 - External services must only be reachable through explicit Gatekeeper capabilities. Do not add ambient outbound access.
-- Model inference is the kernel-managed exception: deployers supply their own Cloudflare AI Gateway configuration, while agent-generated code remains network-isolated.
+- Model inference is the kernel-managed exception: signed-in users supply their own OpenAI-compatible endpoint, model, and key in Settings. The original deployer settings are a fallback for the owner only. Only the API Worker's server-side adapter may reach the provider; agent-generated code remains network-isolated.
+- `apps/api/src/donna-access-identity.ts` validates Access identities. The API scopes one Durable Object per verified user; the owner's existing `donna` object remains private to the owner. `apps/api/src/donna-threads.ts` owns conversation persistence and encrypted per-user model settings; `apps/api/src/openai-compatible-inference.ts` owns model requests. The web opens main on every visit and filters side-chat titles locally.
 - Shared API schemas belong in `packages/api-contract`. Derive TypeScript types from those schemas rather than defining separate contracts.
+- The web uses React, Tailwind CSS v4, and generated shadcn/ui components in `apps/web/src/components/ui`. Do not copy Muse assets or show unsupported controls.
 - Use JSONC for Cloudflare Workers configuration.
+- Cloudflare Access permits email-code sign-in for any verified email through the one-time-PIN login-method Allow policy; the free plan is limited to 50 users. Keep the owner Allow policy and the Access gate enabled.
+- Production custom domains are `donna.kernux.org` (Access-protected web) and `donna-api.kernux.org` (independent bearer-token API). Keep the deployer bearer token, Access verification values, owner email, and stable `SETTINGS_ENCRYPTION_KEY` in gitignored `apps/api/.env`; keep matching Access verification values in `apps/web/.env`. Deploy each Worker from its directory with `npx wrangler deploy --secrets-file .env`. Never widen the Access policy before cross-user isolation tests pass. The browser must not receive the deployer token or saved provider keys.
 - Store secrets in `.env` files and keep them out of source control.
 - Revise this file whenever meaningful changes alter the architecture, scripts, conventions, paths, or operational requirements.
 
