@@ -34,6 +34,7 @@ coverage
 .next/
 out/
 dist
+apps/ios/*.xcodeproj/
 
 # Debug
 npm-debug.log*

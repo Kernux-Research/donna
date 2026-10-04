@@ -1,17 +1,18 @@
 # Donna
 
-Donna is an open source personal agent built on Cloudflare Workers. It provides a client-independent API and a responsive web interface for phone, tablet, and desktop browsers.
+Donna is an open source personal agent built on Cloudflare Workers. It provides a client-independent API, a responsive web interface, and an early native iOS workspace.
 
 External services are available only through narrowly scoped Gatekeepers. Each signed-in user can supply an OpenAI-compatible chat completions API in Settings. Provider keys stay encrypted server-side; only the API Worker performs inference.
 
 ## Status
 
-Donna supports a permanent main chat and multiple side chats with rename, delete, title search, safe Markdown replies, and streamed responses. The web client is deployed at https://donna.kernux.org and the API at https://donna-api.kernux.org. Cloudflare Access handles email-code sign-in; the API isolates each user's chats and model settings. The deployer API token remains private, with no token prompt in the browser. External-service Gatekeepers are not implemented.
+Donna supports a permanent main chat and multiple side chats with rename, delete, title search, safe Markdown replies, and streamed responses. The web client is deployed at https://donna.kernux.org and the API at https://donna-api.kernux.org. Cloudflare Access handles email-code sign-in; the API isolates each user's chats and model settings. The deployer API token remains private, with no token prompt in the browser. The iOS app is currently an unconnected shell; user-owned backend deployment and mobile authentication are not implemented. External-service Gatekeepers are not implemented.
 
 ## Repository structure
 
 - `apps/api`: Donna's public API Worker, Durable Object conversation store, and server-side inference adapter
 - `apps/web`: the responsive first-party React client
+- `apps/ios`: a native SwiftUI workspace, with a macOS simulator test workflow
 - `packages/api-contract`: shared runtime schemas and derived API types
 - `packages/`: tooling and shared packages inherited from the Workers monorepo template
 - `turbo/generators`: generators for additional Workers and packages

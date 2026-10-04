@@ -1,9 +1,9 @@
 # Donna agent instructions
 
 - Donna is an open source personal agent designed for Cloudflare Workers.
-- The API is the complete, client-independent product boundary. `apps/web` is the only bundled client and must not import API implementation code.
+- The API is the complete, client-independent product boundary. `apps/web` and `apps/ios` are first-party clients and must not import API implementation code.
 - The bundled web client must not ask for or expose the Donna deployer API token. Its Worker validates the Cloudflare Access JWT and forwards only that verified identity through the API service binding; the API validates the JWT independently.
-- Build `apps/web` as a responsive browser application for phone, tablet, and desktop viewports. Do not add native mobile or desktop clients unless the product scope changes.
+- Build `apps/web` as a responsive browser application. `apps/ios` is the native SwiftUI client; self-hosted onboarding must not require users to run CLI commands.
 - External services must only be reachable through explicit Gatekeeper capabilities. Do not add ambient outbound access.
 - Model inference is the kernel-managed exception: signed-in users supply their own OpenAI-compatible endpoint, model, and key in Settings. The original deployer settings are a fallback for the owner only. Only the API Worker's server-side adapter may reach the provider; agent-generated code remains network-isolated.
 - `apps/api/src/donna-access-identity.ts` validates Access identities. The API scopes one Durable Object per verified user; the owner's existing `donna` object remains private to the owner. `apps/api/src/donna-threads.ts` owns conversation persistence and encrypted per-user model settings; `apps/api/src/openai-compatible-inference.ts` owns model requests. The web opens main on every visit and filters side-chat titles locally.
@@ -17,6 +17,7 @@
 
 ## Commands
 
+- `apps/ios/project.yml` defines the XcodeGen project. Generate it on a Mac with XcodeGen 2.46.0 or newer, then run the `DonnaIOS` simulator scheme. `.github/workflows/ios.yml` runs iOS UI tests on macOS; Linux cannot validate SwiftUI or the simulator.
 - Use `bun turbo <command>` for validation.
 - For individual packages, run the command within the package directory.
 - For multiple packages, run `bun turbo -F <package-name> -F <other-package-name> <command>` from the repository root.
